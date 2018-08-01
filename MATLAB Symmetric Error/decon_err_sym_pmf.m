@@ -1,6 +1,6 @@
 %% Deconvolution of data X
 
-function [Q,tt,tt1,tt2,normhatphiW] = deconvolve(W)
+function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W)
 %Basic parameters
 n = length(W);
 m = 10;

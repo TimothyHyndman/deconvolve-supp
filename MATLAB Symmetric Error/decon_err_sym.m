@@ -1,27 +1,24 @@
 %% Plot deconvolution stuff
 
-function plotdeconvolution(W,Q,tt,tt1,tt2,normhatphiW,truedens)
-pj = Q.ProbWeights;
-xj = Q.Support;
-n = length(W);
+function [fXdeconvoluted, xx, Q] = decon_err_sym(W, xx)
+    if ~exist('xx','var')
+        xx = linspace(min(W), max(W), 100);
+    end
 
-%Find density from discrete distribution
-xx = linspace(min(W),max(W),1000);
-[fW,xW]=ksdensity(W,xx);
-fXdeconvoluted = makesmooth(xW,tt,tt1,tt2,xj,pj,n,W,normhatphiW);
+    % Deconvolve to pmf --------------------------------------------------------
+    [Q, tt, tt1, tt2, normhatphiW] = decon_err_sym_pmf(W);
+    
 
-%Plot stuff
-hX = plot(xW,truedens(xW),'g','LineWidth',2);
-hold on
-hW = plot(xW,fW,'b','LineWidth',2);
-hj = scatter(xj,pj,'m','filled');
-plot(xW,fXdeconvoluted,'m','LineWidth',2)
-hold off
-legend([hX hW hj],{'f_X','f_W','Our estimate for f_X'},'FontSize',20,'FontWeight','bold')
-axis([min(xW) max(xW) 0 1])
+    % Convert pmf to pdf -------------------------------------------------------    
+    fXdeconvoluted = makesmooth(xx, tt, tt1, tt2, Q.Support, Q.ProbWeights, W, normhatphiW);
 end
 
-function fXdecc = makesmooth(xx,tt,tt1,tt2,xgrid,psol,n,W,normhatphiW)
+% ------------------------------------------------------------------------------
+% Local Functions
+% ------------------------------------------------------------------------------
+
+function fXdecc = makesmooth(xx, tt, tt1, tt2, xgrid, psol, W, normhatphiW)
+    n = length(W);
     dx=xx(2)-xx(1);
 
     %----------------------------
@@ -31,9 +28,10 @@ function fXdecc = makesmooth(xx,tt,tt1,tt2,xgrid,psol,n,W,normhatphiW)
     [rephip,imphip,normphip]=computephiX(tt,xgrid,psol);
     hatphiU=normhatphiW./normphip;
 
-    %----------------------------------------------------------------------------------------
-    %Estimate var(U): approximate phi_U by poly of degree 2, and estimate varU by -2 phi_U''
-    %----------------------------------------------------------------------------------------
+    %---------------------------------------------------------------------------
+    % Estimate var(U): approximate phi_U by poly of degree 2, and estimate varU 
+    % by -2 phi_U''
+    %---------------------------------------------------------------------------
 
     %For this we use a finer grid than the grid tt
     ttBB=tt1:(tt2-tt1)/200:tt2;
@@ -193,4 +191,17 @@ function hPI = PI_deconvUestth4(W,tlim,ppphiU,hatvarU)
 
     indh=find(AMISE==min(AMISE),1,'first');
     hPI = hgrid(indh);
+end
+
+function y=phiUspline(t,hatvarU,tlim,ppphiU)
+
+ind1=(t>=tlim(1))&(t<=tlim(2));
+ind2=(t<tlim(1))|(t>tlim(2));
+
+phiULap = @(t) 1./(1+hatvarU/2*t.^2);
+
+
+y=0*t;
+y(ind1)=ppval(ppphiU,t(ind1));
+y(ind2)=phiULap(t(ind2));
 end
