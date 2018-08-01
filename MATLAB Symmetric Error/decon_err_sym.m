@@ -72,7 +72,7 @@ function fXdecc = makesmooth(xx, tt, tt1, tt2, xgrid, psol, W, normhatphiW)
     fXdecc=fXdecc/sum(fXdecc)/dx;
 end
 
-function [rephip,imphip,normphip]=computephiX(tt,xgrid,psol)
+function [rephip, imphip, normphip] = computephiX(tt, xgrid, psol)
     OO=outerop(tt,xgrid,'*');
     pmat=repmat(psol,length(tt),1);
     cosO=cos(OO).*pmat;
@@ -84,7 +84,7 @@ function [rephip,imphip,normphip]=computephiX(tt,xgrid,psol)
     normphip=sqrt(rephip.^2+imphip.^2);
 end
 
-function y=outerop(a,b,operator)
+function y = outerop(a, b, operator)
     if nargin<3
         operator='+';                       % for only two arguments assume outerproduct 
     end  
@@ -99,7 +99,7 @@ function y=outerop(a,b,operator)
     end
 end
 
-function fXdec=fXKernDec2(xx,hPI,W,tlim,ppphiU,hatvarU)
+function fXdec = fXKernDec2(xx, hPI, W, tlim, ppphiU, hatvarU)
 	phiK = @(t) (1-t.^2).^3;
 	muK2 = 6;
 
@@ -123,7 +123,7 @@ function fXdec=fXKernDec2(xx,hPI,W,tlim,ppphiU,hatvarU)
 	fXdec=sum(fXdec.*repmat(phiK(t),1,length(xx)),1)/(2*pi)*dt/hPI;
 end
 
-function hPI = PI_deconvUestth4(W,tlim,ppphiU,hatvarU)
+function hPI = PI_deconvUestth4(W, tlim, ppphiU, hatvarU)
     phiK = @(t) (1-t.^2).^3;
     muK2 = 6;
     n = length(W);
@@ -193,15 +193,14 @@ function hPI = PI_deconvUestth4(W,tlim,ppphiU,hatvarU)
     hPI = hgrid(indh);
 end
 
-function y=phiUspline(t,hatvarU,tlim,ppphiU)
+function y = phiUspline(t, hatvarU, tlim, ppphiU)
+    ind1=(t>=tlim(1))&(t<=tlim(2));
+    ind2=(t<tlim(1))|(t>tlim(2));
 
-ind1=(t>=tlim(1))&(t<=tlim(2));
-ind2=(t<tlim(1))|(t>tlim(2));
-
-phiULap = @(t) 1./(1+hatvarU/2*t.^2);
+    phiULap = @(t) 1./(1+hatvarU/2*t.^2);
 
 
-y=0*t;
-y(ind1)=ppval(ppphiU,t(ind1));
-y(ind2)=phiULap(t(ind2));
+    y=0*t;
+    y(ind1)=ppval(ppphiU,t(ind1));
+    y(ind2)=phiULap(t(ind2));
 end

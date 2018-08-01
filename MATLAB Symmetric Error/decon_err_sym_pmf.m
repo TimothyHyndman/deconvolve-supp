@@ -1,87 +1,85 @@
 %% Deconvolution of data X
 
 function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W)
-%Basic parameters
-n = length(W);
-m = 10;
+    %Basic parameters
+    n = length(W);
+    m = 10;
 
-%-------------------------------------------------------------
-%-------------------------------------------------------------
-% Precalculate phi_W
-%-------------------------------------------------------------
-%-------------------------------------------------------------
+    %-------------------------------------------------------------
+    %-------------------------------------------------------------
+    % Precalculate phi_W
+    %-------------------------------------------------------------
+    %-------------------------------------------------------------
 
-length_tt=100;
-a=-8;
-b=8;
-tt=a:((b-a)/length_tt):b;
-[tt,tt1,tt2,hat_phi_W,sqrt_psi_hat_W,normhatphiW]=computephiW(tt,length_tt,W,n);
+    length_tt=100;
+    a=-8;
+    b=8;
+    tt=a:((b-a)/length_tt):b;
+    [tt,tt1,tt2,hat_phi_W,sqrt_psi_hat_W,normhatphiW]=computephiW(tt,length_tt,W,n);
 
-%Choose kernel Weight
-weight_type = 'Epanechnikov';
-weight = KernelWeight(weight_type,tt);
+    %Choose kernel Weight
+    weight_type = 'Epanechnikov';
+    weight = KernelWeight(weight_type,tt);
 
-%-------------------------------------------------------------
-%-------------------------------------------------------------
-% Solve for xj,pj
-%-------------------------------------------------------------
-%-------------------------------------------------------------
+    %-------------------------------------------------------------
+    %-------------------------------------------------------------
+    % Solve for xj,pj
+    %-------------------------------------------------------------
+    %-------------------------------------------------------------
 
-fmax = 10^6;   %Just a big number
-n_iterations = 5; %Setting this to 1 works perfectly almost all the time.
-n_var_iterations = 5;  %Usually gets there in first iteration but sometimes needs a few goes
+    fmax = 10^6;   %Just a big number
+    n_iterations = 5; %Setting this to 1 works perfectly almost all the time.
+    n_var_iterations = 5;  %Usually gets there in first iteration but sometimes needs a few goes
 
-%Minimize difference in phase functions
-for i = 1:n_iterations
-    pjtest = unifrnd(0,1,[1,m]);
-    pjtest = pjtest/sum(pjtest);
-    xjtest=sort(unifrnd(min(W),max(W),[1,m]));
-    [pjnew,xjnew,fmaxnew,exitflag] = min_phase(m,W,pjtest,xjtest,tt,hat_phi_W,sqrt_psi_hat_W,weight);
-    %If our new answer is better than our old one then accept it
-    if fmaxnew < fmax && exitflag>0
-        fmax = fmaxnew;
-        pj = pjnew;
-        xj = xjnew;
+    %Minimize difference in phase functions
+    for i = 1:n_iterations
+        pjtest = unifrnd(0,1,[1,m]);
+        pjtest = pjtest/sum(pjtest);
+        xjtest=sort(unifrnd(min(W),max(W),[1,m]));
+        [pjnew,xjnew,fmaxnew,exitflag] = min_phase(m,W,pjtest,xjtest,tt,hat_phi_W,sqrt_psi_hat_W,weight);
+        %If our new answer is better than our old one then accept it
+        if fmaxnew < fmax && exitflag>0
+            fmax = fmaxnew;
+            pj = pjnew;
+            xj = xjnew;
+        end
     end
+
+    %Calculate penalties once 
+    dt = tt(2) - tt(1);
+    integrand = insideintegral(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
+    fmax0 = dt*sum(integrand);
+
+    %Find initial value for varmin based on best solution for fmax
+    varmin = var_objective([pj,xj]);
+
+    for i = 1:n_var_iterations
+        pjtest = unifrnd(0,1,[1,m]);
+        pjtest = pjtest/sum(pjtest);
+        xjtest=sort(unifrnd(min(W),max(W),[1,m]));
+        [pjnew,xjnew,fval,exitflag] = min_var(m,W,pjtest,xjtest,fmax0,tt,hat_phi_W,sqrt_psi_hat_W,weight);
+        if fval < varmin && exitflag > 0
+            varmin = fval;
+            pj = pjnew;
+            xj = xjnew;
+        end   
+    end
+
+    fval2 = phase_objective([pj,xj],m,tt,hat_phi_W,sqrt_psi_hat_W,weight);
+    if fval2/fmax0 < 0.999
+        display('T(Y) got smaller!')
+    end
+
+    [pj,xj] = simplify_masses(pj,xj);
+    Q.Support = xj;
+    Q.ProbWeights = pj;
 end
 
-%Calculate penalties once 
-dt = tt(2) - tt(1);
-integrand = insideintegral(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
-fmax0 = dt*sum(integrand);
-
-%Find initial value for varmin based on best solution for fmax
-varmin = var_objective([pj,xj]);
-
-for i = 1:n_var_iterations
-    pjtest = unifrnd(0,1,[1,m]);
-    pjtest = pjtest/sum(pjtest);
-    xjtest=sort(unifrnd(min(W),max(W),[1,m]));
-    [pjnew,xjnew,fval,exitflag] = min_var(m,W,pjtest,xjtest,fmax0,tt,hat_phi_W,sqrt_psi_hat_W,weight);
-    if fval < varmin && exitflag > 0
-        varmin = fval;
-        pj = pjnew;
-        xj = xjnew;
-    end   
-end
-
-fval2 = phase_objective([pj,xj],m,tt,hat_phi_W,sqrt_psi_hat_W,weight);
-if fval2/fmax0 < 0.999
-    display('T(Y) got smaller!')
-end
-
-[pj,xj] = simplify_masses(pj,xj);
-Q.Support = xj;
-Q.ProbWeights = pj;
-end
-
-%-------------------------------------------------------------
-%-------------------------------------------------------------
+%-------------------------------------------------------------------------------
 % Local Functions
-%-------------------------------------------------------------
-%-------------------------------------------------------------
+%-------------------------------------------------------------------------------
 
-function weight = KernelWeight(weight_type,x)
+function weight = KernelWeight(weight_type, x)
     length_x = length(x);
     switch weight_type
         case 'Epanechnikov'
@@ -99,7 +97,7 @@ function weight = KernelWeight(weight_type,x)
     end
 end
 
-function [tt,tt1,tt2,hat_phi_W,sqrt_psi_hat_W,normhatphiW]=computephiW(tt,length_tt,W,n)
+function [tt, tt1, tt2, hat_phi_W, sqrt_psi_hat_W, normhatphiW] = computephiW(tt, length_tt, W, n)
     OO=outerop(tt,W,'*');
 
     %-----------------------------------------------
@@ -135,7 +133,7 @@ function [tt,tt1,tt2,hat_phi_W,sqrt_psi_hat_W,normhatphiW]=computephiW(tt,length
     sqrt_psi_hat_W = abs(hat_phi_W);
 end
 
-function y=outerop(a,b,operator)
+function y = outerop(a, b, operator)
     if nargin<3
         operator='+';                       % for only two arguments assume outerproduct 
     end  
@@ -152,7 +150,7 @@ end
 
 %------------------------%
 
-function [pj,xj,fval,exitflag] = min_var(m,W,pj,xj,fmax0,t,hat_phi_W,sqrt_psi_hat_W,weight)
+function [pj, xj, fval, exitflag] = min_var(m, W, pj, xj, fmax0, t, hat_phi_W, sqrt_psi_hat_W, weight)
     x = [pj,xj];
     options = optimoptions('fmincon','Display','off','Algorithm','active-set','TolFun',1e-6); 
     %options = optimoptions('fmincon','Display','off','Algorithm','interior-point','TolFun',1e-6,'TolCon',1e-5);
@@ -201,7 +199,7 @@ function fval = var_objective(x)
     fval = sum(pj.*(xj.^2)) - (sum(pj.*xj))^2;
 end
 
-function [c,ceq]=phaseconstraint(x,m,fmax0,t,hat_phi_W,sqrt_psi_hat_W,weight)
+function [c,ceq] = phaseconstraint(x, m, fmax0, t, hat_phi_W, sqrt_psi_hat_W, weight)
     pj = x(1:m);
     xj = x(m+1:2*m);
 
@@ -219,7 +217,7 @@ end
 
 %------------------------%
 
-function [pj,xj,fval,exitflag] = min_phase(m,W,pj,xj,t,hat_phi_W,sqrt_psi_hat_W,weight)
+function [pj, xj, fval, exitflag] = min_phase(m, W, pj, xj, t, hat_phi_W, sqrt_psi_hat_W, weight)
     x = [pj,xj];
     options = optimoptions('fmincon','Display','off','Algorithm','active-set','TolFun',1e-6); 
     %options = optimoptions('fmincon','Display','off','Algorithm','interior-point','TolFun',1e-6);
@@ -259,7 +257,7 @@ function [pj,xj,fval,exitflag] = min_phase(m,W,pj,xj,t,hat_phi_W,sqrt_psi_hat_W,
     xj = x(m+1:2*m);
 end
 
-function [fval,penalty1,penalty2,Tp] = phase_objective(x,m,tt,hat_phi_W,sqrt_psi_hat_W,weight)
+function [fval, penalty1, penalty2, Tp] = phase_objective(x, m, tt, hat_phi_W, sqrt_psi_hat_W, weight)
     %Extract weights and roots
     pj = x(1:m);
     xj = x(m+1:2*m);
@@ -277,7 +275,7 @@ function [fval,penalty1,penalty2,Tp] = phase_objective(x,m,tt,hat_phi_W,sqrt_psi
     fval = Tp+penalty1+penalty2;
 end
 
-function integrand = insideintegral(t,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight)
+function integrand = insideintegral(t, pj, xj, hat_phi_W, sqrt_psi_hat_W, weight)
 
     %Calculate characteristic function of our discrete distribution
     m = length(pj);
@@ -296,7 +294,7 @@ end
 
 %------------------------%
 
-function [pj,xj] = simplify_masses(pj,xj)
+function [pj, xj] = simplify_masses(pj, xj)
     zero_tolerance = 0.0001;
     search_size = 0.01;
 
