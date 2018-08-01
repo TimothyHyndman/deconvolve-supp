@@ -1,16 +1,9 @@
 %% Deconvolution of data X
 
-function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W)
-    %Basic parameters
+function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     n = length(W);
-    m = 10;
-
-    %-------------------------------------------------------------
-    %-------------------------------------------------------------
-    % Precalculate phi_W
-    %-------------------------------------------------------------
-    %-------------------------------------------------------------
-
+    
+    % Precalculate phi_W -------------------------------------------------------
     length_tt = 100;
     mu_K2 = 6;
     RK = 1024 / 3003 / pi;
@@ -18,30 +11,24 @@ function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W)
     hmin = hnaive/3;
     tt = linspace(-1/hmin, 1/hmin, length_tt + 1);
 
+    [tt,tt1,tt2,hat_phi_W,sqrt_psi_hat_W,normhatphiW] = computephiW(tt, length_tt, W, n);
 
-    [tt,tt1,tt2,hat_phi_W,sqrt_psi_hat_W,normhatphiW]=computephiW(tt,length_tt,W,n);
 
-    %Choose kernel Weight
+    % Minimize difference in phase functions -----------------------------------
     weight_type = 'Epanechnikov';
     weight = KernelWeight(weight_type,tt);
 
-    %-------------------------------------------------------------
-    %-------------------------------------------------------------
-    % Solve for xj,pj
-    %-------------------------------------------------------------
-    %-------------------------------------------------------------
-
     fmax = 10^6;   %Just a big number
-    n_iterations = 5; %Setting this to 1 works perfectly almost all the time.
-    n_var_iterations = 5;  %Usually gets there in first iteration but sometimes needs a few goes
-
-    %Minimize difference in phase functions
+    n_iterations = n_tp_iter;
+    n_var_iterations = n_var_iter;
+    
     for i = 1:n_iterations
-        pjtest = unifrnd(0,1,[1,m]);
-        pjtest = pjtest/sum(pjtest);
-        xjtest=sort(unifrnd(min(W),max(W),[1,m]));
+        pjtest = unifrnd(0, 1, [1, m]);
+        pjtest = pjtest / sum(pjtest);
+        xjtest = sort(unifrnd(min(W), max(W), [1, m]));
+
         [pjnew,xjnew,fmaxnew,exitflag] = min_phase(m,W,pjtest,xjtest,tt,hat_phi_W,sqrt_psi_hat_W,weight);
-        %If our new answer is better than our old one then accept it
+
         if fmaxnew < fmax && exitflag>0
             fmax = fmaxnew;
             pj = pjnew;
@@ -49,6 +36,7 @@ function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W)
         end
     end
 
+    % Minimize variance --------------------------------------------------------
     %Calculate penalties once 
     dt = tt(2) - tt(1);
     integrand = insideintegral(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
@@ -69,11 +57,12 @@ function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W)
         end   
     end
 
-    fval2 = phase_objective([pj,xj],m,tt,hat_phi_W,sqrt_psi_hat_W,weight);
+    fval2 = tp_objective([pj,xj],m,tt,hat_phi_W,sqrt_psi_hat_W,weight);
     if fval2/fmax0 < 0.999
         display('T(Y) got smaller!')
     end
 
+    % Finalize -----------------------------------------------------------------
     [pj,xj] = simplify_masses(pj,xj);
     Q.Support = xj;
     Q.ProbWeights = pj;
@@ -101,40 +90,43 @@ function weight = KernelWeight(weight_type, x)
     end
 end
 
-function [tt, tt1, tt2, hat_phi_W, sqrt_psi_hat_W, normhatphiW] = computephiW(tt, length_tt, W, n)
+function  [tt,tt1,tt2,hat_phi_W,sqrt_psi_hat_W,normhatphiW] = computephiW(tt, length_tt, W, n)
+    % Estimate empirical characersitic fucntion of W----------------------------
     OO=outerop(tt,W,'*');
-
-    %-----------------------------------------------
-    %Estimate empirical characersitic fucntion of W
-    %-----------------------------------------------
-
     rehatphiW=sum(cos(OO),2)/n;
     imhatphiW=sum(sin(OO),2)/n;
     normhatphiW=sqrt(rehatphiW.^2+imhatphiW.^2);
 
-    %------------------------------------------------------------
-    %t^*: Keep only t-values such that |\hat_phi_W|< n^{-0.25}
-    %------------------------------------------------------------
+    t_star = find_t_cutoff(normhatphiW, tt);
+    tt1 = -t_star;
+    tt2 = t_star;
 
-    tmp=tt(normhatphiW<n^(-0.25));
-    %Refine the interval of t-values accordingly
-    tt1=max(tmp(tmp<0));
-    tt2=min(tmp(tmp>0));
-    if isempty(tmp(tmp<0))
-        tt1=min(tt);
-    end
-
-    if isempty(tmp(tmp>0))
-        tt2=max(tt);
-    end
+    % tt_new_length = 100
+    % tt = linspace(-t_star, t_star, tt_new_length)
     
     tt=tt1:(tt2-tt1)/length_tt:tt2; %Refined interval of t-values 
+    n = length(W);
     hat_phi_W = 0;
     for i=1:n
         hat_phi_W = hat_phi_W + exp(1i*tt*W(i));
     end
     hat_phi_W = (1/n)*hat_phi_W;
     sqrt_psi_hat_W = abs(hat_phi_W);
+end
+
+function t_star = find_t_cutoff(normhatphiW, tt)
+    ind = find(tt >= 0);
+    d_phi_W = normhatphiW(ind(2:end)) - normhatphiW(ind(1:end-1));
+
+    if length(find(d_phi_W >= 0)) == 0
+        t_star = tt(end);
+    else
+        first_min_ind = ind(min(find(d_phi_W >= 0)));
+        phi_W_threshold = max(normhatphiW(ind(ind >= first_min_ind)));
+        tmp = tt(normhatphiW <= phi_W_threshold);
+        t_star = min(tmp(tmp>0));
+    end
+
 end
 
 function y = outerop(a, b, operator)
@@ -212,9 +204,11 @@ function [c,ceq] = phaseconstraint(x, m, fmax0, t, hat_phi_W, sqrt_psi_hat_W, we
     integrand = insideintegral(t,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
     Tp = dt*sum(integrand);
 
+    [penalty1, penalty2, ~] = penalties(pj,xj,t,hat_phi_W);
+
     %Finish off
     tol = 0;
-    %c=[Tp - fmax0 - tol; penalty1-fmax1 - tol ; penalty2 - fmax2-tol];
+    % c=[Tp - fmax0 - tol; penalty1 -fmax1 - tol ; penalty2 - fmax2-tol];
     c = Tp - fmax0 - tol;
     ceq=[];
 end
@@ -254,14 +248,14 @@ function [pj, xj, fval, exitflag] = min_phase(m, W, pj, xj, t, hat_phi_W, sqrt_p
     ub = ones(2*m,1);
     ub(m+1:2*m) = max(W);
 
-    func = @(x)phase_objective(x,m,t,hat_phi_W,sqrt_psi_hat_W,weight);
+    func = @(x)tp_objective(x,m,t,hat_phi_W,sqrt_psi_hat_W,weight);
     [x,fval,exitflag] = fmincon(func,x,A,b,Aeq,beq,lb,ub,[],options);
 
     pj = x(1:m);
     xj = x(m+1:2*m);
 end
 
-function [fval, penalty1, penalty2, Tp] = phase_objective(x, m, tt, hat_phi_W, sqrt_psi_hat_W, weight)
+function [fval, penalty1, penalty2, Tp] = tp_objective(x, m, tt, hat_phi_W, sqrt_psi_hat_W, weight)
     %Extract weights and roots
     pj = x(1:m);
     xj = x(m+1:2*m);
@@ -272,11 +266,8 @@ function [fval, penalty1, penalty2, Tp] = phase_objective(x, m, tt, hat_phi_W, s
     Tp = dt*sum(integrand);
 
     %Add penalty terms
-    % [penalty1,penalty2] = penalties(pj,xj,tt,hat_phi_W);  %My code is working
-    % without these!! :)
-    penalty1 = 0;
-    penalty2 = 0;
-    fval = Tp+penalty1+penalty2;
+    [penalty1, penalty2, ~] = penalties(pj,xj,tt,hat_phi_W);
+    fval = Tp; %+ penalty1 + penalty2;
 end
 
 function integrand = insideintegral(t, pj, xj, hat_phi_W, sqrt_psi_hat_W, weight)
@@ -294,6 +285,46 @@ function integrand = insideintegral(t, pj, xj, hat_phi_W, sqrt_psi_hat_W, weight
     fred = hat_phi_W.*conj(phi_p) - abs(phi_p).*sqrt_psi_hat_W;
 
     integrand = abs(fred).^2.*weight;
+end
+
+function [penalty1, penalty2, penalty3] = penalties(pj, xj, t, hat_phi_W)
+
+%Calculate characteristic function of our discrete distribution
+m = length(pj);
+phi_p = 0;
+for i=1:m
+    phi_p = phi_p + (pj(i)*exp(1i*t*xj(i)));
+end
+%phi_p = conj(pj*(exp(1i*t'*xj)')); %Slightly slower
+
+re_phi_p = real(phi_p);
+im_phi_p = imag(phi_p);
+re_hat_phi_W = real(hat_phi_W);
+im_hat_phi_W = imag(hat_phi_W);
+norm_hat_phi_W = sqrt(re_hat_phi_W.^2+im_hat_phi_W.^2);
+norm_phi_p = sqrt(re_phi_p.^2+im_phi_p.^2);
+
+%Need phi_U to be real
+penalty1=sum(abs(re_phi_p .* im_hat_phi_W - im_phi_p .* re_hat_phi_W));
+
+%Want phi_W bar(phi_p) = |phi_W||phi_p|
+% error_vec = hat_phi_W.*conj(phi_p) - norm(hat_phi_W).*norm(phi_p);
+% %error_vec = hat_phi_W - norm(hat_phi_W).*phi_p/(norm(phi_p));
+% penalty1 = sum(error_vec);
+
+%impose a penalty if |phi_U| is greater than 1:
+tolerance = 0;
+hat_phi_U=norm_hat_phi_W ./ (norm_phi_p);
+penalty2=sum(hat_phi_U(hat_phi_U > 1 + tolerance));
+
+%impose a penalty if phi_U is < 0
+re_phi_U = real(hat_phi_U);
+penalty3 = -sum(re_phi_U(re_phi_U < 0 - tolerance));
+
+%Scale
+scale = 1;
+penalty1 = scale*penalty1;
+penalty2 = scale*penalty2;
 end
 
 %------------------------%
