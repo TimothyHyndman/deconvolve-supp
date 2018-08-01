@@ -11,10 +11,14 @@ function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W)
     %-------------------------------------------------------------
     %-------------------------------------------------------------
 
-    length_tt=100;
-    a=-8;
-    b=8;
-    tt=a:((b-a)/length_tt):b;
+    length_tt = 100;
+    mu_K2 = 6;
+    RK = 1024 / 3003 / pi;
+    hnaive = ((8 * sqrt(pi) * RK/3/mu_K2^2)^0.2) * var(W) * n^(-1/5);
+    hmin = hnaive/3;
+    tt = linspace(-1/hmin, 1/hmin, length_tt + 1);
+
+
     [tt,tt1,tt2,hat_phi_W,sqrt_psi_hat_W,normhatphiW]=computephiW(tt,length_tt,W,n);
 
     %Choose kernel Weight
