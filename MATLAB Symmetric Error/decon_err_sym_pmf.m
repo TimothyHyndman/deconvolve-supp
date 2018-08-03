@@ -9,9 +9,39 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     RK = 1024 / 3003 / pi;
     hnaive = ((8 * sqrt(pi) * RK/3/mu_K2^2)^0.2) * var(W) * n^(-1/5);
     hmin = hnaive/3;
-    tt = linspace(-1/hmin, 1/hmin, length_tt + 1);
+    tt = linspace(-1/hmin, 1/hmin, length_tt);
 
-    [tt,tt1,tt2,hat_phi_W,sqrt_psi_hat_W,normhatphiW] = computephiW(tt, length_tt, W, n);
+    [rehatphiW, imhatphiW] = compute_phi_W(tt, W);
+    normhatphiW = sqrt(rehatphiW.^2 + imhatphiW.^2)';
+    t_star = find_t_cutoff(normhatphiW, tt);
+
+
+
+
+    % %Refined interval of t-values 
+    % tt = linspace(-t_star, t_star, length_tt+1); 
+    % [rehatphiW, imhatphiW] = compute_phi_W(tt, W);
+    % hat_phi_W = complex(rehatphiW, imhatphiW)';
+
+    % [rehatpsi, imhatpsi, sqabshatpsi] = compute_psi_W(tt, W);
+    % % sqrt_psi_hat_W = abs(hat_phi_W);
+    % sqrt_psi_hat_W = sqabshatpsi';
+
+
+    tt1 = -t_star; 
+    tt2 = t_star; 
+     tt=tt1:(tt2-tt1)/length_tt:tt2; %Refined interval of t-values  
+    n = length(W); 
+    hat_phi_W = 0; 
+    for i=1:n 
+        hat_phi_W = hat_phi_W + exp(1i*tt*W(i)); 
+    end 
+    hat_phi_W = (1/n)*hat_phi_W; 
+    sqrt_psi_hat_W = abs(hat_phi_W); 
+
+
+
+
 
 
     % Minimize difference in phase functions -----------------------------------
@@ -33,6 +63,11 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
             fmax = fmaxnew;
             pj = pjnew;
             xj = xjnew;
+            display("pass")
+        end
+
+        if exitflag <= 0
+            display("fail")
         end
     end
 
@@ -98,47 +133,6 @@ function weight = KernelWeight(weight_type, x)
         case 'Triweight'
             max_x = -x(1);
             weight = 35/(32*max_x)*(1 - (x/max_x).^2).^3;
-    end
-end
-
-function  [tt,tt1,tt2,hat_phi_W,sqrt_psi_hat_W,normhatphiW] = computephiW(tt, length_tt, W, n)
-    % Estimate empirical characersitic fucntion of W----------------------------
-    OO=outerop(tt,W,'*');
-    rehatphiW=sum(cos(OO),2)/n;
-    imhatphiW=sum(sin(OO),2)/n;
-    normhatphiW=sqrt(rehatphiW.^2+imhatphiW.^2);
-
-    t_star = find_t_cutoff(normhatphiW, tt)
-    figure(1)
-    plot(tt, normhatphiW)
-    tt1 = -t_star;
-    tt2 = t_star;
-
-    % tt_new_length = 100
-    % tt = linspace(-t_star, t_star, tt_new_length)
-    
-    tt=tt1:(tt2-tt1)/length_tt:tt2; %Refined interval of t-values 
-    n = length(W);
-    hat_phi_W = 0;
-    for i=1:n
-        hat_phi_W = hat_phi_W + exp(1i*tt*W(i));
-    end
-    hat_phi_W = (1/n)*hat_phi_W;
-    sqrt_psi_hat_W = abs(hat_phi_W);
-end
-
-function y = outerop(a, b, operator)
-    if nargin<3
-        operator='+';                       % for only two arguments assume outerproduct 
-    end  
-
-    if isequal(operator,'*')                % common operator 
-        y=a(:)*b(:)';
-    else    
-      outera=a(:)*ones(1,length(b));        % these are the matrices that 
-      outerb=ones(length(a),1)*b(:).';      % meshgrid(A,B) would generate 
-      functionHandle=str2func(operator);  % new R14 functionality
-      y=functionHandle(outera,outerb);    % allows faster/neater method
     end
 end
 

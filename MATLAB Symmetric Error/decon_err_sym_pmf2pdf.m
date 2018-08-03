@@ -1,12 +1,14 @@
-function fX = decon_err_sym_pmf2pdf(xx, tt, theta, p, W, normhatphiW)
+function fX = decon_err_sym_pmf2pdf(xx, tt, theta, p, W)
     
     % Estimate sd_U ------------------------------------------------------------
     tt_BB_length = 200;
     tt_BB = linspace(tt(1), tt(end), tt_BB_length);
-    var_U = estimate_var_u(W, tt_BB, theta, p);
+    var_U = estimate_var_u(W, tt_BB, theta, p)
 
     % Estimate PhiX and PhiU ---------------------------------------------------
     [rephip, imphip, normphip] = computephiX(tt, theta, p);
+    [rehatphiW, imhatphiW] = compute_phi_W(tt, W);
+    normhatphiW = sqrt(rehatphiW.^2 + imhatphiW.^2);
     hatphiU = normhatphiW ./ normphip;
 
     % Adjust estimator of phi_U as recommended in the paper --------------------
@@ -14,7 +16,7 @@ function fX = decon_err_sym_pmf2pdf(xx, tt, theta, p, W, normhatphiW)
     ppphiU = spline(tt, hatphiU);
 
     % Find Plug-In Bandwidth ---------------------------------------------------
-    h = PI_deconvUestth4(W, tlim, ppphiU, var_U);
+    h = PI_deconvUestth4(W, tlim, ppphiU, var_U)
 
     % Compute estimator --------------------------------------------------------
     fX = fXKernDec2(xx, h, W, tlim, ppphiU, var_U);
@@ -47,6 +49,11 @@ function var_U = estimate_var_u(W, tt_BB, theta, p)
 
     t_vec = tt_BB(hatphiUBB' >= 0.95);
     phi_U_t_vec = hatphiUBB(hatphiUBB' >= 0.95);
+
+    display(t_vec)
+    display(phi_U_t_vec)
+
+
     pp = polyfit(t_vec, phi_U_t_vec', 2);
     var_U = -2*pp(1);
 end
