@@ -1,6 +1,6 @@
 %% Deconvolution of data X
 
-function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
+function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     n = length(W);
     
     % Precalculate phi_W -------------------------------------------------------
@@ -18,7 +18,7 @@ function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_i
     weight_type = 'Epanechnikov';
     weight = KernelWeight(weight_type,tt);
 
-    fmax = Inf;   %Just a big number
+    fmax = Inf;
     n_iterations = n_tp_iter;
     n_var_iterations = n_var_iter;
     
@@ -30,7 +30,7 @@ function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_i
         [pjnew,xjnew,fmaxnew,exitflag] = min_phase(m,W,pjtest,xjtest,tt,hat_phi_W,sqrt_psi_hat_W,weight);
 
         if fmaxnew < fmax && exitflag>0
-            fmax = fmaxnew
+            fmax = fmaxnew;
             pj = pjnew;
             xj = xjnew;
         end
@@ -39,13 +39,10 @@ function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_i
     % Minimize variance --------------------------------------------------------
     %Calculate penalties once 
     tp_max = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight)
-    [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W)
-    pj
-    xj
-    % tp_max = tp + penalty1 + penalty2;
+    [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W);
 
     %Find initial value for varmin based on best solution for fmax
-    varmin = var_objective([pj(1:end-1),xj]');
+    varmin = var_objective([pj(1:end-1),xj]')
 
     for i = 1:n_var_iterations
         pjtest = unifrnd(0,1,[1,m]);
@@ -60,7 +57,8 @@ function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_i
     end
 
     tp_max = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight)
-    [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W)
+    varmin
+    [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W);
     
 
     % fval2 = tp_objective([pj,xj],m,tt,hat_phi_W,sqrt_psi_hat_W,weight);
@@ -70,8 +68,6 @@ function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_i
 
     % Finalize -----------------------------------------------------------------
     [pj,xj] = simplify_masses(pj,xj);
-    pj
-    xj
     Q.Support = xj;
     Q.ProbWeights = pj;
 end
@@ -112,7 +108,9 @@ function  [tt,tt1,tt2,hat_phi_W,sqrt_psi_hat_W,normhatphiW] = computephiW(tt, le
     imhatphiW=sum(sin(OO),2)/n;
     normhatphiW=sqrt(rehatphiW.^2+imhatphiW.^2);
 
-    t_star = find_t_cutoff(normhatphiW, tt);
+    t_star = find_t_cutoff(normhatphiW, tt)
+    figure(1)
+    plot(tt, normhatphiW)
     tt1 = -t_star;
     tt2 = t_star;
 
@@ -151,35 +149,6 @@ function [pj, xj, fval, exitflag] = min_var(m, W, pj, xj, tp_max, penalty1_max, 
     options = optimoptions('fmincon','Display','off','Algorithm','active-set','TolFun',1e-6); 
     %options = optimoptions('fmincon','Display','off','Algorithm','interior-point','TolFun',1e-6,'TolCon',1e-5);
     %options = optimoptions('fmincon','Display','off','Algorithm','sqp','TolFun',1e-6);
-
-    % %Setup constraints in form A*x<b. We need that entries of pj are
-    % %non-negative
-    % A = zeros(2*m);
-    % A(1:m,1:m) = -eye(m);
-    % b = zeros(2*m,1);
-
-    % %Optional: The xj are increasing
-    % for i = 1:m-1
-    %     A(m+i,m+i) = 1;
-    % end
-    % for i = 1:m-1
-    %     A(m+i,m+i+1) = -1;
-    % end
-    % b(2*m) = 1;
-
-    % %Setup constraints in the form Aeq*x = beq. We need that the pj add up to one.
-    % Aeq = zeros(2*m);
-    % beq = zeros(2*m,1);
-    % Aeq(2*m,1:m) = ones(1,m);
-    % beq(2*m) = 1;
-
-    % %Setup bounds lb<x<ub
-    % %Masses
-    % lb = zeros(2*m,1);
-    % ub = ones(2*m,1);
-    % %Roots
-    % lb(m+1:2*m) = min(W);
-    % ub(m+1:2*m) = max(W);
 
     % pj non-negative
     A_tp = zeros(2*m + 1, 2*m - 1);
@@ -237,33 +206,6 @@ function [pj, xj, fval, exitflag] = min_phase(m, W, pj, xj, t, hat_phi_W, sqrt_p
     %options = optimoptions('fmincon','Display','off','Algorithm','interior-point','TolFun',1e-6);
     %options = optimoptions('fmincon','Display','off','Algorithm','sqp','TolFun',1e-6);
 
-    % %Setup constraints in form A*x<b. We need that entries of pj are
-    % %non-negative
-    % A = zeros(2*m);
-    % A(1:m,1:m) = -eye(m);
-    % b = zeros(2*m,1);
-
-    % %Optional: The xj are increasing
-    % for i = 1:m-1
-    %     A(m+i,m+i) = 1;
-    % end
-    % for i = 1:m-1
-    %     A(m+i,m+i+1) = -1;
-    % end
-    % b(2*m) = 1;
-
-    % %Setup constraints in the form Aeq*x = beq. We need that the pj add up to one.
-    % Aeq = zeros(2*m);
-    % beq = zeros(2*m,1);
-    % Aeq(2*m,1:m) = ones(1,m);
-    % beq(2*m) = 1;
-
-    % %Setup bounds lb<x<ub
-    % lb = zeros(2*m,1);
-    % lb(m+1:2*m) = min(W);
-    % ub = ones(2*m,1);
-    % ub(m+1:2*m) = max(W);
-
     % pj non-negative
     A_tp = zeros(2*m + 1, 2*m - 1);
     A_tp(1:(m-1), 1:(m-1)) = eye( m - 1 );
@@ -283,7 +225,6 @@ function [pj, xj, fval, exitflag] = min_phase(m, W, pj, xj, t, hat_phi_W, sqrt_p
 
     A_tp = -A_tp;
     B_tp = -B_tp;
-
 
     func = @(x)tp_objective(x,m,t,hat_phi_W,sqrt_psi_hat_W,weight);
     [x,fval,exitflag] = fmincon(func, x, A_tp, B_tp,[],[],[],[],[],options);
