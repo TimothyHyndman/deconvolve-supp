@@ -122,21 +122,6 @@ function  [tt,tt1,tt2,hat_phi_W,sqrt_psi_hat_W,normhatphiW] = computephiW(tt, le
     sqrt_psi_hat_W = abs(hat_phi_W);
 end
 
-function t_star = find_t_cutoff(normhatphiW, tt)
-    ind = find(tt >= 0);
-    d_phi_W = normhatphiW(ind(2:end)) - normhatphiW(ind(1:end-1));
-
-    if length(find(d_phi_W >= 0)) == 0
-        t_star = tt(end);
-    else
-        first_min_ind = ind(min(find(d_phi_W >= 0)));
-        phi_W_threshold = max(normhatphiW(ind(ind >= first_min_ind)));
-        tmp = tt(normhatphiW <= phi_W_threshold);
-        t_star = min(tmp(tmp>0));
-    end
-
-end
-
 function y = outerop(a, b, operator)
     if nargin<3
         operator='+';                       % for only two arguments assume outerproduct 
