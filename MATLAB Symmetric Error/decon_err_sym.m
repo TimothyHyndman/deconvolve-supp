@@ -7,10 +7,12 @@ function [fXdeconvoluted, xx, Q] = decon_err_sym(W, xx)
 
     % Deconvolve to pmf --------------------------------------------------------
     m = 10;
-    n_tp_iter = 10;
+    n_tp_iter = 5;
     n_var_iter = 2;
     [Q, tt, tt1, tt2, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter);
     
+    %Troubleshooting section (remove late) -------------------------------------
+    save("files", 'xx','tt', 'tt1', 'tt2', 'Q', 'W', 'normhatphiW')
 
     % Convert pmf to pdf -------------------------------------------------------    
     fXdeconvoluted = makesmooth(xx, tt, tt1, tt2, Q.Support, Q.ProbWeights, W, normhatphiW);
