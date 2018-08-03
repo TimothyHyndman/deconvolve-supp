@@ -7,7 +7,7 @@ function [fXdeconvoluted, xx, Q] = decon_err_sym(W, xx)
 
     % Deconvolve to pmf --------------------------------------------------------
     m = 10;
-    n_tp_iter = 5;
+    n_tp_iter = 10;
     n_var_iter = 2;
     [Q, tt, tt1, tt2, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter);
     
@@ -120,11 +120,12 @@ end
 function hPI = PI_deconvUestth4(W, tlim, ppphiU, var_U)
     phiK = @(t) (1-t.^2).^3;
     muK2 = 6;
+    RK = 1024 / 3003 / pi;
     n = length(W);
 
     %grid of h values where to search for a solution
     maxh=(max(W)-min(W))/10;
-    hnaive=1.06*sqrt(var(W))*n^(-1/5);
+    hnaive = ((8 * sqrt(pi) * RK/3/muK2^2)^0.2) * sqrt(var(W))*n^(-1/5);
     hgrid=hnaive/3:(maxh-hnaive/3)/100:maxh;
 
     lh = length(hgrid);

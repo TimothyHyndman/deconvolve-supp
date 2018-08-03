@@ -18,7 +18,7 @@ function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_i
     weight_type = 'Epanechnikov';
     weight = KernelWeight(weight_type,tt);
 
-    fmax = 10^6;   %Just a big number
+    fmax = Inf;   %Just a big number
     n_iterations = n_tp_iter;
     n_var_iterations = n_var_iter;
     
@@ -30,7 +30,7 @@ function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_i
         [pjnew,xjnew,fmaxnew,exitflag] = min_phase(m,W,pjtest,xjtest,tt,hat_phi_W,sqrt_psi_hat_W,weight);
 
         if fmaxnew < fmax && exitflag>0
-            fmax = fmaxnew;
+            fmax = fmaxnew
             pj = pjnew;
             xj = xjnew;
         end
@@ -38,18 +38,20 @@ function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_i
 
     % Minimize variance --------------------------------------------------------
     %Calculate penalties once 
-    dt = tt(2) - tt(1);
-    integrand = insideintegral(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
-    fmax0 = dt*sum(integrand);
+    tp_max = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight)
+    [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W)
+    pj
+    xj
+    % tp_max = tp + penalty1 + penalty2;
 
     %Find initial value for varmin based on best solution for fmax
     varmin = var_objective([pj,xj]);
 
     for i = 1:n_var_iterations
         pjtest = unifrnd(0,1,[1,m]);
-        pjtest = pjtest/sum(pjtest);
-        xjtest=sort(unifrnd(min(W),max(W),[1,m]));
-        [pjnew,xjnew,fval,exitflag] = min_var(m,W,pjtest,xjtest,fmax0,tt,hat_phi_W,sqrt_psi_hat_W,weight);
+        pjtest = pjtest / sum(pjtest);
+        xjtest=sort(unifrnd(min(W), max(W), [1,m]));
+        [pjnew,xjnew,fval,exitflag] = min_var(m,W,pjtest,xjtest,tp_max,penalty1_max,penalty2_max,tt,hat_phi_W,sqrt_psi_hat_W,weight);
         if fval < varmin && exitflag > 0
             varmin = fval;
             pj = pjnew;
@@ -57,13 +59,19 @@ function [Q,tt,tt1,tt2,normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_i
         end   
     end
 
-    fval2 = tp_objective([pj,xj],m,tt,hat_phi_W,sqrt_psi_hat_W,weight);
-    if fval2/fmax0 < 0.999
-        display('T(Y) got smaller!')
-    end
+    tp_max = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight)
+    [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W)
+    
+
+    % fval2 = tp_objective([pj,xj],m,tt,hat_phi_W,sqrt_psi_hat_W,weight);
+    % if fval2/tp_max < 0.999
+    %     display('T(Y) got smaller!')
+    % end
 
     % Finalize -----------------------------------------------------------------
     [pj,xj] = simplify_masses(pj,xj);
+    pj
+    xj
     Q.Support = xj;
     Q.ProbWeights = pj;
 end
@@ -146,7 +154,7 @@ end
 
 %------------------------%
 
-function [pj, xj, fval, exitflag] = min_var(m, W, pj, xj, fmax0, t, hat_phi_W, sqrt_psi_hat_W, weight)
+function [pj, xj, fval, exitflag] = min_var(m, W, pj, xj, tp_max, penalty1_max, penalty2_max, t, hat_phi_W, sqrt_psi_hat_W, weight)
     x = [pj,xj];
     options = optimoptions('fmincon','Display','off','Algorithm','active-set','TolFun',1e-6); 
     %options = optimoptions('fmincon','Display','off','Algorithm','interior-point','TolFun',1e-6,'TolCon',1e-5);
@@ -181,7 +189,7 @@ function [pj, xj, fval, exitflag] = min_var(m, W, pj, xj, fmax0, t, hat_phi_W, s
     lb(m+1:2*m) = min(W);
     ub(m+1:2*m) = max(W);
     func = @(x) var_objective(x);
-    nonlcon = @(x)phaseconstraint(x,m,fmax0,t,hat_phi_W,sqrt_psi_hat_W,weight);
+    nonlcon = @(x)phaseconstraint(x,m,tp_max,penalty1_max, penalty2_max,t,hat_phi_W,sqrt_psi_hat_W,weight);
     [x,fval,exitflag] = fmincon(func,x,A,b,Aeq,beq,lb,ub,nonlcon,options);
 
     pj = x(1:m);
@@ -195,21 +203,20 @@ function fval = var_objective(x)
     fval = sum(pj.*(xj.^2)) - (sum(pj.*xj))^2;
 end
 
-function [c,ceq] = phaseconstraint(x, m, fmax0, t, hat_phi_W, sqrt_psi_hat_W, weight)
+function [c,ceq] = phaseconstraint(x, m, tp_max, penalty1_max, penalty2_max, t, hat_phi_W, sqrt_psi_hat_W, weight)
     pj = x(1:m);
     xj = x(m+1:2*m);
 
     %My own integral thingo
     dt = t(2) - t(1);
-    integrand = insideintegral(t,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
-    Tp = dt*sum(integrand);
+    tp = calculate_tp(t,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
 
     [penalty1, penalty2, ~] = penalties(pj,xj,t,hat_phi_W);
 
     %Finish off
     tol = 0;
-    % c=[Tp - fmax0 - tol; penalty1 -fmax1 - tol ; penalty2 - fmax2-tol];
-    c = Tp - fmax0 - tol;
+    c = [tp - tp_max; penalty1 - penalty1_max; penalty2 - penalty2_max] - tol;
+    % c = tp - tp_max - tol;
     ceq=[];
 end
 
@@ -255,22 +262,21 @@ function [pj, xj, fval, exitflag] = min_phase(m, W, pj, xj, t, hat_phi_W, sqrt_p
     xj = x(m+1:2*m);
 end
 
-function [fval, penalty1, penalty2, Tp] = tp_objective(x, m, tt, hat_phi_W, sqrt_psi_hat_W, weight)
+function [fval, penalty1, penalty2, tp] = tp_objective(x, m, tt, hat_phi_W, sqrt_psi_hat_W, weight)
     %Extract weights and roots
     pj = x(1:m);
     xj = x(m+1:2*m);
 
     %Integrate
     dt = tt(2) - tt(1);
-    integrand = insideintegral(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
-    Tp = dt*sum(integrand);
+    tp = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
 
     %Add penalty terms
     [penalty1, penalty2, ~] = penalties(pj,xj,tt,hat_phi_W);
-    fval = Tp; %+ penalty1 + penalty2;
+    fval = tp + penalty1 + penalty2;
 end
 
-function integrand = insideintegral(t, pj, xj, hat_phi_W, sqrt_psi_hat_W, weight)
+function tp = calculate_tp(t, pj, xj, hat_phi_W, sqrt_psi_hat_W, weight)
 
     %Calculate characteristic function of our discrete distribution
     m = length(pj);
@@ -278,13 +284,11 @@ function integrand = insideintegral(t, pj, xj, hat_phi_W, sqrt_psi_hat_W, weight
     for i=1:m
         phi_p = phi_p + (pj(i)*exp(1i*t*xj(i)));
     end
-    %phi_p = conj(pj*(exp(1i*t'*xj)')); %Slightly Slower
 
     %Calculate integrand
-    %fred = hat_phi_W - sqrt_psi_hat_W.*phi_p./abs(phi_p);  %Slightly slower
-    fred = hat_phi_W.*conj(phi_p) - abs(phi_p).*sqrt_psi_hat_W;
-
-    integrand = abs(fred).^2.*weight;
+    integrand = abs(hat_phi_W.*conj(phi_p) - abs(phi_p).*sqrt_psi_hat_W).^2.*weight;
+    dt = t(2) - t(1);
+    tp = dt * sum(integrand);
 end
 
 function [penalty1, penalty2, penalty3] = penalties(pj, xj, t, hat_phi_W)
@@ -330,8 +334,8 @@ end
 %------------------------%
 
 function [pj, xj] = simplify_masses(pj, xj)
-    zero_tolerance = 0.0001;
-    search_size = 0.01;
+    zero_tolerance = 0.001;
+    search_size = 0.001;
 
     %Get rid of zeros
     index = 1;
