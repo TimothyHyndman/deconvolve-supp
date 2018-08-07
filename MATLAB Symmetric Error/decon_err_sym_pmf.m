@@ -46,8 +46,10 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     fmax = Inf;
     n_iterations = n_tp_iter;
     n_var_iterations = n_var_iter;
+
+    counter = 0;
     
-    for i = 1:n_iterations
+    while counter < n_iterations
         pjtest = unifrnd(0, 1, [1, m]);
         pjtest = pjtest / sum(pjtest);
         xjtest = sort(unifrnd(min(W), max(W), [1, m]));
@@ -58,12 +60,15 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
             fmax = fmaxnew;
             pj = pjnew;
             xj = xjnew;
-            display("pass")
         end
 
         if exitflag <= 0
             display("fail")
+        else
+            display("pass")
+            % counter = counter + 1;
         end
+        counter = counter + 1;
     end
 
     % Minimize variance --------------------------------------------------------
@@ -74,7 +79,9 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     %Find initial value for varmin based on best solution for fmax
     varmin = var_objective([pj(1:end-1),xj]')
 
-    for i = 1:n_var_iterations
+    counter = 0;
+
+    while counter < n_var_iterations
         pjtest = unifrnd(0,1,[1,m]);
         pjtest = pjtest / sum(pjtest);
         xjtest=sort(unifrnd(min(W), max(W), [1,m]));
@@ -83,7 +90,15 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
             varmin = fval;
             pj = pjnew;
             xj = xjnew;
-        end   
+        end
+
+        if exitflag <= 0
+            display("fail")
+        else
+            display("pass")
+            % counter = counter + 1;
+        end
+        counter = counter + 1;
     end
 
     tp_max = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight)
