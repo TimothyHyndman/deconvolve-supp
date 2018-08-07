@@ -32,43 +32,18 @@ end
 % ------------------------------------------------------------------------------
 
 function var_U = estimate_var_u(W, tt_BB, theta, p)
-    n = length(W);
-    OO = reshape(tt_BB, [], 1) * reshape(W, 1, []);
-    re_phi_W_BB = sum(cos(OO), 2) / n;
-    im_phi_W_BB = sum(sin(OO), 2) / n;
 
-    % clear OO;
+    [re_phi_W_BB, im_phi_W_BB] = compute_phi_W(tt_BB, W);
     norm_phi_W_BB = sqrt(re_phi_W_BB.^2 + im_phi_W_BB.^2);
-    % clear re_phi_W_BB im_phi_W_BB;
 
     [re_phi_X_BB, im_phi_X_BB, norm_phi_X_BB] = computephiX(tt_BB, theta, p);
     hatphiUBB = norm_phi_W_BB ./ norm_phi_X_BB;
 
-    figure(2)
-    plot(tt_BB, hatphiUBB)
-
     t_vec = tt_BB(hatphiUBB' >= 0.95);
     phi_U_t_vec = hatphiUBB(hatphiUBB' >= 0.95);
 
-    display(t_vec)
-    display(phi_U_t_vec)
-
-
     pp = polyfit(t_vec, phi_U_t_vec', 2);
-    var_U = -2*pp(1);
-end
-
-
-function [rephip, imphip, normphip] = computephiX(tt, theta, p)
-    OO=outerop(tt,theta,'*');
-    pmat=repmat(p,length(tt),1);
-    cosO=cos(OO).*pmat;
-    sinO=sin(OO).*pmat;
-    clear OO;
-
-    rephip=sum(cosO,2);
-    imphip=sum(sinO,2);
-    normphip=sqrt(rephip.^2+imphip.^2);
+    var_U = abs(2*pp(1));
 end
 
 function y = outerop(a, b, operator)

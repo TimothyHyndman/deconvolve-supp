@@ -7,7 +7,7 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     length_tt = 100;
     mu_K2 = 6;
     RK = 1024 / 3003 / pi;
-    hnaive = ((8 * sqrt(pi) * RK/3/mu_K2^2)^0.2) * var(W) * n^(-1/5);
+    hnaive = ((8 * sqrt(pi) * RK/3/mu_K2^2)^0.2) * sqrt(var(W)) * n^(-1/5);
     hmin = hnaive/3;
     tt = linspace(-1/hmin, 1/hmin, length_tt);
 
@@ -30,23 +30,18 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
 
     tt1 = -t_star; 
     tt2 = t_star; 
-     tt=tt1:(tt2-tt1)/length_tt:tt2; %Refined interval of t-values  
-    n = length(W); 
-    hat_phi_W = 0; 
-    for i=1:n 
-        hat_phi_W = hat_phi_W + exp(1i*tt*W(i)); 
-    end 
-    hat_phi_W = (1/n)*hat_phi_W; 
-    sqrt_psi_hat_W = abs(hat_phi_W); 
+    tt = linspace(tt1, tt2, length_tt);
 
-
-
-
+    [rehatphiW, imhatphiW] = compute_phi_W(tt, W);
+    hat_phi_W = complex(rehatphiW, imhatphiW)';
+    sqrt_psi_hat_W = sqrt(rehatphiW.^2 + imhatphiW.^2)';
 
 
     % Minimize difference in phase functions -----------------------------------
     weight_type = 'Epanechnikov';
     weight = KernelWeight(weight_type,tt);
+
+    %TESTED IDENTICAL TO HERE%
 
     fmax = Inf;
     n_iterations = n_tp_iter;
