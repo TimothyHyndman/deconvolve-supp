@@ -74,12 +74,13 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     % Minimize variance --------------------------------------------------------
     %Calculate penalties once 
     tp_max = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight)
-    [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W);
+    [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W)
 
     %Find initial value for varmin based on best solution for fmax
-    varmin = var_objective([pj(1:end-1),xj]')
+    varmin = var_objective([pj(1:end-1),xj]');
 
     counter = 0;
+    % counter = n_var_iterations;
 
     while counter < n_var_iterations
         pjtest = unifrnd(0,1,[1,m]);
@@ -101,8 +102,7 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
         counter = counter + 1;
     end
 
-    tp_max = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight)
-    varmin
+    tp_max = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
     [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W);
     
 
@@ -197,8 +197,9 @@ function [c,ceq] = phaseconstraint(x, m, tp_max, penalty1_max, penalty2_max, t, 
 
     %Finish off
     tol = 0;
-    c = [tp - tp_max; penalty1 - penalty1_max; penalty2 - penalty2_max] - tol;
+    % c = [tp - tp_max; penalty1 - penalty1_max; penalty2 - penalty2_max] - tol;
     % c = tp - tp_max - tol;
+    c = [tp - tp_max, penalty1];
     ceq=[];
 end
 
@@ -246,7 +247,8 @@ function [fval, penalty1, penalty2, tp] = tp_objective(x, m, tt, hat_phi_W, sqrt
 
     %Add penalty terms
     [penalty1, penalty2, ~] = penalties(pj,xj,tt,hat_phi_W);
-    fval = tp + penalty1 + penalty2;
+    penalty_scale = 500;
+    fval = tp + penalty_scale * (penalty1 + penalty2);
 end
 
 function tp = calculate_tp(t, pj, xj, hat_phi_W, sqrt_psi_hat_W, weight)
@@ -267,22 +269,24 @@ end
 function [penalty1, penalty2, penalty3] = penalties(pj, xj, t, hat_phi_W)
 
 %Calculate characteristic function of our discrete distribution
-m = length(pj);
-phi_p = 0;
-for i=1:m
-    phi_p = phi_p + (pj(i)*exp(1i*t*xj(i)));
-end
+% m = length(pj);
+% phi_p = 0;
+% for i=1:m
+%     phi_p = phi_p + (pj(i)*exp(1i*t*xj(i)));
+% end
 %phi_p = conj(pj*(exp(1i*t'*xj)')); %Slightly slower
 
-re_phi_p = real(phi_p);
-im_phi_p = imag(phi_p);
+% re_phi_p = real(phi_p);
+% im_phi_p = imag(phi_p);
 re_hat_phi_W = real(hat_phi_W);
 im_hat_phi_W = imag(hat_phi_W);
-norm_hat_phi_W = sqrt(re_hat_phi_W.^2+im_hat_phi_W.^2);
-norm_phi_p = sqrt(re_phi_p.^2+im_phi_p.^2);
+norm_hat_phi_W = sqrt(re_hat_phi_W.^2 + im_hat_phi_W.^2);
+% norm_phi_p = sqrt(re_phi_p.^2 + im_phi_p.^2);
+
+[re_phi_p, im_phi_p, norm_phi_p] = computephiX(t, xj, pj);
 
 %Need phi_U to be real
-penalty1=sum(abs(re_phi_p .* im_hat_phi_W - im_phi_p .* re_hat_phi_W));
+penalty1  = sum(abs(re_phi_p' .* im_hat_phi_W - im_phi_p' .* re_hat_phi_W));
 
 %Want phi_W bar(phi_p) = |phi_W||phi_p|
 % error_vec = hat_phi_W.*conj(phi_p) - norm(hat_phi_W).*norm(phi_p);
