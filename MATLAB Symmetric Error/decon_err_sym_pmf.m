@@ -14,34 +14,17 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     [rehatphiW, imhatphiW] = compute_phi_W(tt, W);
     normhatphiW = sqrt(rehatphiW.^2 + imhatphiW.^2)';
     t_star = find_t_cutoff(normhatphiW, tt);
-
-
-
-
-    % %Refined interval of t-values 
-    % tt = linspace(-t_star, t_star, length_tt+1); 
-    % [rehatphiW, imhatphiW] = compute_phi_W(tt, W);
-    % hat_phi_W = complex(rehatphiW, imhatphiW)';
-
-    % [rehatpsi, imhatpsi, sqabshatpsi] = compute_psi_W(tt, W);
-    % % sqrt_psi_hat_W = abs(hat_phi_W);
-    % sqrt_psi_hat_W = sqabshatpsi';
-
-
-    tt1 = -t_star; 
-    tt2 = t_star; 
-    tt = linspace(tt1, tt2, length_tt);
+    tt = linspace(-t_star, t_star, length_tt);
 
     [rehatphiW, imhatphiW] = compute_phi_W(tt, W);
     hat_phi_W = complex(rehatphiW, imhatphiW)';
-    sqrt_psi_hat_W = sqrt(rehatphiW.^2 + imhatphiW.^2)';
+    % sqrt_psi_hat_W = sqrt(rehatphiW.^2 + imhatphiW.^2)';
+    sqrt_psi_hat_W = compute_psi_W(tt, W)';
 
 
     % Minimize difference in phase functions -----------------------------------
     weight_type = 'Epanechnikov';
     weight = KernelWeight(weight_type,tt);
-
-    %TESTED IDENTICAL TO HERE%
 
     fmax = Inf;
     n_iterations = n_tp_iter;
@@ -56,7 +39,7 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
 
         [pjnew,xjnew,fmaxnew,exitflag] = min_phase(m,W,pjtest,xjtest,tt,hat_phi_W,sqrt_psi_hat_W,weight);
 
-        if fmaxnew < fmax && exitflag>0
+        if fmaxnew < fmax %&& exitflag>0
             fmax = fmaxnew;
             pj = pjnew;
             xj = xjnew;
@@ -247,7 +230,7 @@ function [fval, penalty1, penalty2, tp] = tp_objective(x, m, tt, hat_phi_W, sqrt
 
     %Add penalty terms
     [penalty1, penalty2, ~] = penalties(pj,xj,tt,hat_phi_W);
-    penalty_scale = 500;
+    penalty_scale = 1;
     fval = tp + penalty_scale * (penalty1 + penalty2);
 end
 
@@ -261,7 +244,7 @@ function tp = calculate_tp(t, pj, xj, hat_phi_W, sqrt_psi_hat_W, weight)
     end
 
     %Calculate integrand
-    integrand = abs(hat_phi_W.*conj(phi_p) - abs(phi_p).*sqrt_psi_hat_W).^2.*weight;
+    integrand = abs(hat_phi_W - sqrt_psi_hat_W .* phi_p ./ abs(phi_p)).^2.*weight;
     dt = t(2) - t(1);
     tp = dt * sum(integrand);
 end
