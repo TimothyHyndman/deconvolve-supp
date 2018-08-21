@@ -17,9 +17,10 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     tt = linspace(-t_star, t_star, length_tt);
 
     [rehatphiW, imhatphiW] = compute_phi_W(tt, W);
-    hat_phi_W = complex(rehatphiW, imhatphiW)';
+    hat_phi_W = complex(rehatphiW, imhatphiW).';
     % sqrt_psi_hat_W = sqrt(rehatphiW.^2 + imhatphiW.^2)';
-    sqrt_psi_hat_W = compute_psi_W(tt, W)';
+    [~, ~, sqrt_psi_hat_W] = compute_psi_W(tt, W);
+    sqrt_psi_hat_W = sqrt_psi_hat_W';
 
 
     % Minimize difference in phase functions -----------------------------------
@@ -32,6 +33,8 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
 
     counter = 0;
     
+    disp(join(["Minimizing T(p)"]))
+    drawnow
     while counter < n_iterations
         pjtest = unifrnd(0, 1, [1, m]);
         pjtest = pjtest / sum(pjtest);
@@ -43,51 +46,61 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
             fmax = fmaxnew;
             pj = pjnew;
             xj = xjnew;
+            tp = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
+            [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W);
+            disp(join(["T(p) =", num2str(tp)]))
         end
 
         if exitflag <= 0
-            display("fail")
-        else
-            display("pass")
-            % counter = counter + 1;
+            disp(join(["Fail with exitflag", num2str(exitflag)]))
         end
+
         counter = counter + 1;
+        drawnow
     end
 
     % Minimize variance --------------------------------------------------------
     %Calculate penalties once 
-    tp_max = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight)
-    [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W)
+    tp_max = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
+    [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W);
+    disp(join(["tp_max =", num2str(tp_max)]))
+    disp(join(["penalties =", num2str(penalty1_max), ",", num2str(penalty2_max)]))
 
     %Find initial value for varmin based on best solution for fmax
-    varmin = var_objective([pj(1:end-1),xj]');
+    varmin = var_objective([pj(1:end-1), xj]');
+    varmin_init = varmin;
 
     counter = 0;
     % counter = n_var_iterations;
-
+    disp("Minimizing Variance")
     while counter < n_var_iterations
         pjtest = unifrnd(0,1,[1,m]);
         pjtest = pjtest / sum(pjtest);
         xjtest=sort(unifrnd(min(W), max(W), [1,m]));
         [pjnew,xjnew,fval,exitflag] = min_var(m,W,pjtest,xjtest,tp_max,penalty1_max,penalty2_max,tt,hat_phi_W,sqrt_psi_hat_W,weight);
-        if fval < varmin && exitflag > 0
+        if fval < varmin %&& exitflag > 0
             varmin = fval;
             pj = pjnew;
             xj = xjnew;
+            disp(num2str(fval))
+            counter = counter + 1;
         end
 
         if exitflag <= 0
-            display("fail")
-        else
-            display("pass")
-            % counter = counter + 1;
+            disp(join(["Fail with exitflag", num2str(exitflag)]))
         end
-        counter = counter + 1;
+
+        drawnow
     end
 
     tp_max = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
     [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W);
-    
+    finalvar = var_objective([pj(1:end-1), xj]');
+
+    disp(join(["Initial variance was", num2str(varmin_init)]))
+    disp(join(["Final variance is", num2str(finalvar)]))
+    disp(join(["T(p) =", num2str(tp_max)]))
+    disp(join(["penalties =", num2str(penalty1_max), ",", num2str(penalty2_max)]))
 
     % fval2 = tp_objective([pj,xj],m,tt,hat_phi_W,sqrt_psi_hat_W,weight);
     % if fval2/tp_max < 0.999
@@ -192,7 +205,7 @@ function [pj, xj, fval, exitflag] = min_phase(m, W, pj, xj, t, hat_phi_W, sqrt_p
     x = [pj(1:end-1), xj]';
     options = optimoptions('fmincon','Display','off','Algorithm','active-set','TolFun',1e-6); 
     %options = optimoptions('fmincon','Display','off','Algorithm','interior-point','TolFun',1e-6);
-    %options = optimoptions('fmincon','Display','off','Algorithm','sqp','TolFun',1e-6);
+    % options = optimoptions('fmincon','Display','off','Algorithm','sqp','TolFun',1e-6);
 
     % pj non-negative
     A_tp = zeros(2*m + 1, 2*m - 1);
@@ -225,7 +238,6 @@ function [fval, penalty1, penalty2, tp] = tp_objective(x, m, tt, hat_phi_W, sqrt
     [pj, xj] = x_to_pmf(x);
 
     %Integrate
-    dt = tt(2) - tt(1);
     tp = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
 
     %Add penalty terms
@@ -237,58 +249,33 @@ end
 function tp = calculate_tp(t, pj, xj, hat_phi_W, sqrt_psi_hat_W, weight)
 
     %Calculate characteristic function of our discrete distribution
-    m = length(pj);
-    phi_p = 0;
-    for i=1:m
-        phi_p = phi_p + (pj(i)*exp(1i*t*xj(i)));
-    end
+    [re_phi_p, im_phi_p, norm_phi_p] = computephiX(t, xj, pj);
+    phi_p = complex(re_phi_p, im_phi_p);
 
     %Calculate integrand
-    integrand = abs(hat_phi_W - sqrt_psi_hat_W .* phi_p ./ abs(phi_p)).^2.*weight;
+    integrand = abs(hat_phi_W - sqrt_psi_hat_W .* phi_p' ./ norm_phi_p').^2.*weight;
     dt = t(2) - t(1);
     tp = dt * sum(integrand);
 end
 
 function [penalty1, penalty2, penalty3] = penalties(pj, xj, t, hat_phi_W)
 
-%Calculate characteristic function of our discrete distribution
-% m = length(pj);
-% phi_p = 0;
-% for i=1:m
-%     phi_p = phi_p + (pj(i)*exp(1i*t*xj(i)));
-% end
-%phi_p = conj(pj*(exp(1i*t'*xj)')); %Slightly slower
-
-% re_phi_p = real(phi_p);
-% im_phi_p = imag(phi_p);
 re_hat_phi_W = real(hat_phi_W);
 im_hat_phi_W = imag(hat_phi_W);
 norm_hat_phi_W = sqrt(re_hat_phi_W.^2 + im_hat_phi_W.^2);
-% norm_phi_p = sqrt(re_phi_p.^2 + im_phi_p.^2);
-
 [re_phi_p, im_phi_p, norm_phi_p] = computephiX(t, xj, pj);
 
 %Need phi_U to be real
-penalty1  = sum(abs(re_phi_p' .* im_hat_phi_W - im_phi_p' .* re_hat_phi_W));
-
-%Want phi_W bar(phi_p) = |phi_W||phi_p|
-% error_vec = hat_phi_W.*conj(phi_p) - norm(hat_phi_W).*norm(phi_p);
-% %error_vec = hat_phi_W - norm(hat_phi_W).*phi_p/(norm(phi_p));
-% penalty1 = sum(error_vec);
+a = re_phi_p' .* im_hat_phi_W;
+b = im_phi_p' .* re_hat_phi_W;
+c = a - b;
+penalty1  = sum(abs(c));
 
 %impose a penalty if |phi_U| is greater than 1:
-tolerance = 0;
-hat_phi_U=norm_hat_phi_W ./ (norm_phi_p);
-penalty2=sum(hat_phi_U(hat_phi_U > 1 + tolerance));
+hat_phi_U = norm_hat_phi_W ./ norm_phi_p';
+penalty2 = sum(hat_phi_U(hat_phi_U > 1));
 
-%impose a penalty if phi_U is < 0
-re_phi_U = real(hat_phi_U);
-penalty3 = -sum(re_phi_U(re_phi_U < 0 - tolerance));
-
-%Scale
-scale = 1;
-penalty1 = scale*penalty1;
-penalty2 = scale*penalty2;
+penalty3 = 0;   %Removed this penalty
 end
 
 %------------------------%

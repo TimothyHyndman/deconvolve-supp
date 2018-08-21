@@ -3,7 +3,7 @@ function fX = decon_err_sym_pmf2pdf(xx, tt, theta, p, W)
     % Estimate sd_U ------------------------------------------------------------
     tt_BB_length = 200;
     tt_BB = linspace(tt(1), tt(end), tt_BB_length);
-    var_U = estimate_var_u(W, tt_BB, theta, p)
+    var_U = estimate_var_u(W, tt_BB, theta, p);
 
     % Estimate PhiX and PhiU ---------------------------------------------------
     [rephip, imphip, normphip] = computephiX(tt, theta, p);
@@ -16,7 +16,7 @@ function fX = decon_err_sym_pmf2pdf(xx, tt, theta, p, W)
     ppphiU = spline(tt, hatphiU);
 
     % Find Plug-In Bandwidth ---------------------------------------------------
-    h = PI_deconvUestth4(W, tlim, ppphiU, var_U)
+    h = PI_deconvUestth4(W, tlim, ppphiU, var_U);
 
     % Compute estimator --------------------------------------------------------
     fX = fXKernDec2(xx, h, W, tlim, ppphiU, var_U);
