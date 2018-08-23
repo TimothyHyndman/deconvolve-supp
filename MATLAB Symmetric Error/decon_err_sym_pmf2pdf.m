@@ -1,4 +1,4 @@
-function fX = decon_err_sym_pmf2pdf(xx, tt, theta, p, W)
+function fX = decon_err_sym_pmf2pdf(xx, tt, theta, p, W, bw)
     
     % Estimate sd_U ------------------------------------------------------------
     tt_BB_length = 200;
@@ -16,7 +16,12 @@ function fX = decon_err_sym_pmf2pdf(xx, tt, theta, p, W)
     ppphiU = spline(tt, hatphiU);
 
     % Find Plug-In Bandwidth ---------------------------------------------------
-    h = PI_deconvUestth4(W, tlim, ppphiU, var_U);
+    if isempty(bw)
+        h = PI_deconvUestth4(W, tlim, ppphiU, var_U);
+    else
+        h = bw;
+    end
+    
 
     % Compute estimator --------------------------------------------------------
     fX = fXKernDec2(xx, h, W, tlim, ppphiU, var_U);
