@@ -1,7 +1,9 @@
 %% Deconvolution of data X
 
-function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
+function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter, show_diagnostics)
     n = length(W);
+
+    diagnostic = @(message) print_diagnostic(message, show_diagnostics);
     
     % Precalculate phi_W -------------------------------------------------------
     length_tt = 100;
@@ -39,8 +41,7 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     % ------------------
     % Min T(p)
     % ------------------
-    disp(join(["Minimizing T(p)"]))
-    drawnow
+    diagnostic("Minimizing T(p)")
 
     func = @(x) tp_objective(x, m, tt, hat_phi_W, sqrt_psi_hat_W, weight);
 
@@ -55,20 +56,18 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
         [x, fval, exitflag] = fmincon(func, x0, A, B,[],[],[],[],[], options);
         [pj_new, xj_new] = x_to_pmf(x);
 
-        disp(num2str(exitflag))
+        diagnostic(num2str(exitflag))
 
         if fval < fmax && exitflag >= 0
             fmax = fval;
             pj = pj_new;
             xj = xj_new;
-            disp(num2str(fval))
+            diagnostic(num2str(fval))
         end
 
         if (exitflag >= 0)
             counter = counter + 1;
         end
-
-        drawnow
     end
 
     % ------------------
@@ -78,8 +77,8 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     %Calculate penalties once 
     tp_max = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
     [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W);
-    disp(join(["tp_max =", num2str(tp_max)]))
-    disp(join(["penalties =", num2str(penalty1_max), ",", num2str(penalty2_max)]))
+    diagnostic(join(["tp_max =", num2str(tp_max)]))
+    diagnostic(join(["penalties =", num2str(penalty1_max), ",", num2str(penalty2_max)]))
 
     %Find initial value for varmin based on best solution for fmax
     varmin = var_objective([pj(1:end-1), xj]');
@@ -90,7 +89,7 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
 
     counter = 0;
     
-    disp("Minimizing Variance")
+    diagnostic("Minimizing Variance")
     while counter < n_var_iter
         pj_0 = unifrnd(0,1,[1,m]);
         pj_0 = pj_0 / sum(pj_0);
@@ -104,13 +103,13 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
             exitflag = -99;
         end
 
-        disp(num2str(exitflag))
+        diagnostic(num2str(exitflag))
 
         if fval < varmin && exitflag >= 0
             varmin = fval;
             pj = pj_new;
             xj = xj_new;
-            disp(num2str(fval))
+            diagnostic(num2str(fval))
         end
 
         if (exitflag >= 0)
@@ -124,10 +123,10 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     [penalty1_final, penalty2_final, ~] = penalties(pj, xj, tt, hat_phi_W);
     var_final = var_objective([pj(1:end-1), xj]');
 
-    disp(join(["Initial variance was", num2str(varmin_init)]))
-    disp(join(["Final variance is", num2str(var_final)]))
-    disp(join(["T(p) =", num2str(tp_final)]))
-    disp(join(["penalties =", num2str(penalty1_final), ",", num2str(penalty2_final)]))
+    diagnostic(join(["Initial variance was", num2str(varmin_init)]))
+    diagnostic(join(["Final variance is", num2str(var_final)]))
+    diagnostic(join(["T(p) =", num2str(tp_final)]))
+    diagnostic(join(["penalties =", num2str(penalty1_final), ",", num2str(penalty2_final)]))
 
     % Finalize -----------------------------------------------------------------
     % [pj,xj] = simplify_masses(pj,xj);
@@ -311,4 +310,11 @@ function [A, B] = create_bound_matrices(W, m)
 
     A = -A;
     B = -B;
+end
+
+function print_diagnostic(message, show_diagnostics)
+    if show_diagnostics
+        disp(message)
+        drawnow
+    end
 end
