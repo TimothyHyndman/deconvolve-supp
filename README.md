@@ -6,7 +6,7 @@ Supplementary files for the R package [*deconvolve*](https://github.com/timothyh
 MATLAB Symmetric Error
 ------------
 
-MATLAB files to perform deconvolution of data $W = X + U$, where $U$ is unknown and assumed symmetric. The R code in deconvolve can be unreliable so this has been offered as an alternative. Methods used are as indicated in the documentation for deconvolve.
+MATLAB files to perform deconvolution of data *W = X + U*, where *U* is unknown and assumed symmetric. The R code in deconvolve can be unreliable so this has been offered as an alternative. Methods used are as indicated in the documentation for deconvolve.
 
 ### Syntax
 ```matlab
@@ -38,7 +38,7 @@ load('framingham.mat')
 [y, x, Q] = decon_err_sym(W)
 ```
 
-Use $m=20$ and show diagnostic messages
+Use *m = 20* and show diagnostic messages
 
 ```matlab
 load('framingham.mat')
