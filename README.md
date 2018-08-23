@@ -24,7 +24,7 @@ All arguments except for `W` will use default values when they are set to `[]`.
 
 * `W` - A vector of the univariate contaminated data. This argument must be supplied, however all other arguments are optional.
 * `xx` - A vector of x values on which to compute the density. Defaults to `linspace(min(W), max(W), 100)`.
-* `m` - The number of point masses used to estimate the distribution of $X$. Defaults to 10.
+* `m` - The number of point masses used to estimate the distribution of *X*. Defaults to 10.
 * `pmf` - If `true`, does not calculate `y`, instead only calculates `Q`. Defaults to `false`.
 * `bw` - The bandwidth to use. Defaults to a bandwidth calculated using an appropriate plug-in estimator.
 * `show_diagnostic` - If `true`, prints messages to screen showing the exitflags and minimum values of each of the optimizations performed. Intended to be used for development only.
@@ -32,15 +32,15 @@ All arguments except for `W` will use default values when they are set to `[]`.
 
 ### Examples
 
-Typical usage
+Typical usage:
 ```matlab
 load('framingham.mat')
-[y, x, Q] = decon_err_sym(W)
+[y, x, Q] = decon_err_sym(W);
 ```
 
-Use *m = 20* and show diagnostic messages
+Use *m = 20* and show diagnostic messages:
 
 ```matlab
 load('framingham.mat')
-[y, x, Q] = decon_err_sym(W, [], 20, [], [], true)
+[y, x, Q] = decon_err_sym(W, [], 20, [], [], true);
 ```
