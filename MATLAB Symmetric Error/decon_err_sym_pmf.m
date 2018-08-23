@@ -81,7 +81,7 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter, s
     diagnostic(join(["penalties =", num2str(penalty1_max), ",", num2str(penalty2_max)]))
 
     %rescale penalties to allow some room
-    penalty_tolerance_scale = 0.1;
+    penalty_tolerance_scale = 0.05;
     tp_max = tp_max * (1 + penalty_tolerance_scale);
     penalty1_max = penalty1_max * (1 + penalty_tolerance_scale);
     penalty2_max = penalty2_max * (1 + penalty_tolerance_scale);
@@ -135,7 +135,7 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter, s
     diagnostic(join(["penalties =", num2str(penalty1_final), ",", num2str(penalty2_final)]))
 
     % Finalize -----------------------------------------------------------------
-    % [pj,xj] = simplify_masses(pj,xj);
+    [pj,xj] = simplify_masses(pj,xj);
     Q.Support = xj;
     Q.ProbWeights = pj;
 end

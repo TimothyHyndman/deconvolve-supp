@@ -5,7 +5,7 @@ function [fXdeconvoluted, xx, Q] = decon_err_sym(W, xx, m, pmf, bw, show_diagnos
     end
 
     if (~exist('m', 'var') | isempty(m))
-      m = 20;
+      m = 10;
     end
 
     if m < 2
