@@ -6,8 +6,8 @@ function [fXdeconvoluted, xx, Q] = decon_err_sym(W, xx)
 
     % Deconvolve to pmf --------------------------------------------------------
     m = 20;
-    n_tp_iter = 5;
-    n_var_iter = 2;
+    n_tp_iter = 10;
+    n_var_iter = 10;
     [Q, tt, normhatphiW] = decon_err_sym_pmf(W, ...
                                              m, ...
                                              n_tp_iter, ...
