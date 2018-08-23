@@ -1,14 +1,14 @@
 function [fXdeconvoluted, xx, Q] = decon_err_sym(W, xx, m, show_diagnostics)
 
-    if ~exist('xx','var')
+    if (~exist('xx','var') | isempty(xx))
         xx = linspace(min(W), max(W), 100);
     end
 
-    if ~exist('m', 'var')
+    if (~exist('m', 'var') | isempty(m))
       m = 20;
     end
 
-    if ~exist('show_diagnostics', 'var')
+    if (~exist('show_diagnostics', 'var') | isempty(show_diagnostics))
       show_diagnostics = 0;
     end
 

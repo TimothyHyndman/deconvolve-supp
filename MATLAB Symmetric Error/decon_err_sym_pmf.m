@@ -80,6 +80,12 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter, s
     diagnostic(join(["tp_max =", num2str(tp_max)]))
     diagnostic(join(["penalties =", num2str(penalty1_max), ",", num2str(penalty2_max)]))
 
+    %rescale penalties to allow some room
+    penalty_tolerance_scale = 0.1;
+    tp_max = tp_max * (1 + penalty_tolerance_scale);
+    penalty1_max = penalty1_max * (1 + penalty_tolerance_scale);
+    penalty2_max = penalty2_max * (1 + penalty_tolerance_scale);
+
     %Find initial value for varmin based on best solution for fmax
     varmin = var_objective([pj(1:end-1), xj]');
     varmin_init = varmin;
@@ -154,7 +160,7 @@ function flag = is_feasible(pj, xj, A, B, nonlcon)
         flag = 0;
     end
 
-    non_lin_tol = 1e-2;
+    non_lin_tol = 1e-5;
     if any(nonlcon(x) > non_lin_tol)
         flag = 0;
     end
