@@ -18,20 +18,21 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
 
     [rehatphiW, imhatphiW] = compute_phi_W(tt, W);
     hat_phi_W = complex(rehatphiW, imhatphiW).';
-    % sqrt_psi_hat_W = sqrt(rehatphiW.^2 + imhatphiW.^2)';
     [~, ~, sqrt_psi_hat_W] = compute_psi_W(tt, W);
     sqrt_psi_hat_W = sqrt_psi_hat_W';
 
-    weight_type = 'Epanechnikov';
-    weight = KernelWeight(weight_type,tt);
+    weight = KernelWeight('Epanechnikov',tt);
 
     %--------------------------------------------------------------------------%
     % Solve optimization problem to find PMF
     %--------------------------------------------------------------------------%
 
-    options = optimoptions('fmincon','Display','off','Algorithm','active-set','TolFun',1e-6); 
-    %options = optimoptions('fmincon','Display','off','Algorithm','interior-point','TolFun',1e-6,'TolCon',1e-5);
-    %options = optimoptions('fmincon','Display','off','Algorithm','sqp','TolFun',1e-6);
+    options = optimoptions('fmincon', ...
+                           'Display', 'off', ...
+                           'Algorithm', 'active-set', ...
+                           'TolFun', 1e-6, ...
+                           'MaxFunctionEvaluations', 1e4, ...
+                           'MaxIterations', 5e3);
     
     [A, B] = create_bound_matrices(W, m);
 
@@ -41,32 +42,31 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     disp(join(["Minimizing T(p)"]))
     drawnow
 
+    func = @(x) tp_objective(x, m, tt, hat_phi_W, sqrt_psi_hat_W, weight);
+
     fmax = Inf;
     counter = 0;
     while counter < n_tp_iter
-        pjtest = unifrnd(0, 1, [1, m]);
-        pjtest = pjtest / sum(pjtest);
-        xjtest = sort(unifrnd(min(W), max(W), [1, m]));
+        pj_0 = unifrnd(0, 1, [1, m]);
+        pj_0 = pj_0 / sum(pj_0);
+        xj_0 = sort(unifrnd(min(W), max(W), [1, m]));
 
-        [pjnew, xjnew, fmaxnew, exitflag] = min_phase(m, W, pjtest, xjtest, tt, hat_phi_W, ...
-                                                      sqrt_psi_hat_W, weight);
+        x0 = [pj_0(1:end-1), xj_0]';
+        [x, fval, exitflag] = fmincon(func, x0, A, B,[],[],[],[],[], options);
+        [pj_new, xj_new] = x_to_pmf(x);
 
         disp(num2str(exitflag))
 
-        if fmaxnew < fmax && exitflag >= 0
-            fmax = fmaxnew;
-            pj = pjnew;
-            xj = xjnew;
-            % tp = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
-            % [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W);
-            disp(join(["T(p) objective =", num2str(fmax)]))
+        if fval < fmax && exitflag >= 0
+            fmax = fval;
+            pj = pj_new;
+            xj = xj_new;
+            disp(num2str(fval))
         end
 
-        if exitflag < 0
-            disp(join(["Fail with exitflag", num2str(exitflag)]))
+        if (exitflag >= 0)
+            counter = counter + 1;
         end
-
-        counter = counter + 1;
 
         drawnow
     end
@@ -74,7 +74,7 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
     % ------------------
     % Min Var
     % ------------------
-    
+
     %Calculate penalties once 
     tp_max = calculate_tp(tt,pj,xj,hat_phi_W,sqrt_psi_hat_W,weight);
     [penalty1_max, penalty2_max, ~] = penalties(pj, xj, tt, hat_phi_W);
@@ -99,6 +99,10 @@ function [Q, tt, normhatphiW] = decon_err_sym_pmf(W, m, n_tp_iter, n_var_iter)
         x0 = [pj_0(1:end-1), xj_0]';
         [x, fval, exitflag] = fmincon(func, x0, A, B, [], [], [], [], nonlcon, options);
         [pj_new, xj_new] = x_to_pmf(x);
+
+        if ~is_feasible(pj_new, xj_new, A, B, nonlcon)
+            exitflag = -99;
+        end
 
         disp(num2str(exitflag))
 
@@ -142,20 +146,19 @@ function [pj, xj] = x_to_pmf(x)
     xj = x(m:(2 * m - 1));
 end
 
-%------------------------%
-
-function [pj, xj, fval, exitflag] = min_phase(m, W, pj, xj, t, hat_phi_W, sqrt_psi_hat_W, weight)
+function flag = is_feasible(pj, xj, A, B, nonlcon)
+    flag = 1;
     x = [pj(1:end-1), xj]';
-    options = optimoptions('fmincon','Display','off','Algorithm','active-set','TolFun',1e-6); 
-    %options = optimoptions('fmincon','Display','off','Algorithm','interior-point','TolFun',1e-6);
-    % options = optimoptions('fmincon','Display','off','Algorithm','sqp','TolFun',1e-6);
 
-    [A, B] = create_bound_matrices(W, m);
+    lin_tol = 1e-5;
+    if any(A * x - B > lin_tol)
+        flag = 0;
+    end
 
-    func = @(x)tp_objective(x,m,t,hat_phi_W,sqrt_psi_hat_W,weight);
-    [x,fval,exitflag] = fmincon(func, x, A, B,[],[],[],[],[],options);
-
-    [pj, xj] = x_to_pmf(x);
+    non_lin_tol = 1e-2;
+    if any(nonlcon(x) > non_lin_tol)
+        flag = 0;
+    end
 end
 
 function [fval, penalty1, penalty2, tp] = tp_objective(x, m, tt, hat_phi_W, sqrt_psi_hat_W, weight)
@@ -170,23 +173,6 @@ function [fval, penalty1, penalty2, tp] = tp_objective(x, m, tt, hat_phi_W, sqrt
     penalty_scale = 500;
     fval = tp + penalty_scale * (penalty1 + penalty2);
 end
-
-%------------------------%
-
-% function [pj, xj, fval, exitflag] = min_var(m, W, pj, xj, tp_max, penalty1_max, penalty2_max, t, hat_phi_W, sqrt_psi_hat_W, weight)
-%     x = [pj(1:end-1),xj]';
-%     options = optimoptions('fmincon','Display','off','Algorithm','active-set','TolFun',1e-6); 
-%     %options = optimoptions('fmincon','Display','off','Algorithm','interior-point','TolFun',1e-6,'TolCon',1e-5);
-%     %options = optimoptions('fmincon','Display','off','Algorithm','sqp','TolFun',1e-6);
-
-%     [A, B] = create_bound_matrices(W, m);
-
-%     func = @(x) var_objective(x);
-%     nonlcon = @(x)phaseconstraint(x,m,tp_max,penalty1_max, penalty2_max,t,hat_phi_W,sqrt_psi_hat_W,weight);
-%     [x,fval,exitflag] = fmincon(func, x, A, B, [], [], [], [], nonlcon, options);
-
-%     [pj, xj] = x_to_pmf(x);
-% end
 
 function var1 = var_objective(x)
     [pj, xj] = x_to_pmf(x);
@@ -203,8 +189,6 @@ function [c,ceq] = phaseconstraint(x, tp_max, penalty1_max, penalty2_max, t, hat
     % c = [tp - tp_max, penalty1];
     ceq=[];
 end
-
-%------------------------%
 
 function tp = calculate_tp(t, pj, xj, hat_phi_W, sqrt_psi_hat_W, weight)
 
@@ -228,14 +212,11 @@ norm_hat_phi_W = sqrt(re_hat_phi_W.^2 + im_hat_phi_W.^2);
 %Need phi_U to be real
 a = re_phi_p' .* im_hat_phi_W;
 b = im_phi_p' .* re_hat_phi_W;
-c = a - b;
-penalty1  = sum(abs(c));
-% penalty1 = 0;
+penalty1  = sum(abs(a - b));
 
 %impose a penalty if |phi_U| is greater than 1:
 hat_phi_U = norm_hat_phi_W ./ norm_phi_p';
 penalty2 = sum(hat_phi_U(hat_phi_U > 1));
-% penalty2 = 0;
 
 penalty3 = 0;   %Removed this penalty
 end
